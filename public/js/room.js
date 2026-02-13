@@ -186,8 +186,15 @@
     }
 
     // --- AudioContext (iOS speaker routing fix) ---
+    // On iOS, getUserMedia routes all audio output to the earpiece speaker.
+    // AudioContext bypasses this and outputs through the loudspeaker.
+    // Only enabled on iOS — desktop browsers play audio fine from <video>.
 
     initAudioContext() {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (!isIOS) return;
+
       try {
         this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
         this.audioContext.resume().catch(() => {});
@@ -201,7 +208,7 @@
         document.addEventListener('touchstart', resume, { once: true });
         document.addEventListener('click', resume, { once: true });
       } catch {
-        // AudioContext not available — audio falls back to <video> element
+        this.audioContext = null;
       }
     }
 
@@ -319,14 +326,10 @@
 
         if (peer && peer.videoEl) {
           peer.videoEl.srcObject = remoteStream;
-          // Mute the video element if AudioContext handles audio (prevents double audio)
-          if (this.audioContext) {
-            peer.videoEl.muted = true;
-          }
           peer.videoEl.play().catch((err) => console.warn('play() failed:', err));
         }
 
-        // Route audio through AudioContext — fixes iOS earpiece-only routing
+        // iOS only: route audio through AudioContext to fix earpiece-only routing
         if (event.track.kind === 'audio' && this.audioContext) {
           try {
             const source = this.audioContext.createMediaStreamSource(
@@ -335,8 +338,6 @@
             source.connect(this.audioContext.destination);
           } catch (err) {
             console.warn('AudioContext audio routing failed:', err);
-            // Unmute video element as fallback
-            if (peer && peer.videoEl) peer.videoEl.muted = false;
           }
         }
       };
