@@ -30,6 +30,7 @@
       this.hasMultipleCameras = false;
       this.wakeLock = null;
       this.statsInterval = null;
+      this.audioContext = null;
 
       // Adaptive quality state
       this.currentTierIndex = 0; // Start at highest
@@ -61,6 +62,7 @@
       try {
         this.statusText.textContent = 'Requesting camera & microphone...';
         await this.acquireMedia();
+        this.initAudioContext();
         this.updateMirror();
         this.statusText.textContent = 'Fetching connection config...';
         await this.fetchIceServers();
@@ -183,6 +185,26 @@
       this.localVideo.style.transform = this.usingBackCamera ? 'none' : 'scaleX(-1)';
     }
 
+    // --- AudioContext (iOS speaker routing fix) ---
+
+    initAudioContext() {
+      try {
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        this.audioContext.resume().catch(() => {});
+
+        // iOS may need a user gesture to resume — listen for first interaction
+        const resume = () => {
+          if (this.audioContext && this.audioContext.state === 'suspended') {
+            this.audioContext.resume();
+          }
+        };
+        document.addEventListener('touchstart', resume, { once: true });
+        document.addEventListener('click', resume, { once: true });
+      } catch {
+        // AudioContext not available — audio falls back to <video> element
+      }
+    }
+
     // --- ICE Servers ---
 
     async fetchIceServers() {
@@ -294,11 +316,28 @@
       pc.ontrack = (event) => {
         remoteStream.addTrack(event.track);
         const peer = this.peers.get(peerId);
+
         if (peer && peer.videoEl) {
           peer.videoEl.srcObject = remoteStream;
-          // iOS Safari won't autoplay audio without explicit .play()
-          const playPromise = peer.videoEl.play();
-          if (playPromise) playPromise.catch(() => {});
+          // Mute the video element if AudioContext handles audio (prevents double audio)
+          if (this.audioContext) {
+            peer.videoEl.muted = true;
+          }
+          peer.videoEl.play().catch((err) => console.warn('play() failed:', err));
+        }
+
+        // Route audio through AudioContext — fixes iOS earpiece-only routing
+        if (event.track.kind === 'audio' && this.audioContext) {
+          try {
+            const source = this.audioContext.createMediaStreamSource(
+              new MediaStream([event.track])
+            );
+            source.connect(this.audioContext.destination);
+          } catch (err) {
+            console.warn('AudioContext audio routing failed:', err);
+            // Unmute video element as fallback
+            if (peer && peer.videoEl) peer.videoEl.muted = false;
+          }
         }
       };
 
