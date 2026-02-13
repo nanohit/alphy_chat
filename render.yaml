@@ -10,3 +10,5 @@ services:
         value: 10000
       - key: METERED_API_KEY
         sync: false
+      - key: METERED_DOMAIN
+        sync: false

@@ -92,8 +92,9 @@ app.get('/api/turn-credentials', async (req, res) => {
   }
 
   try {
+    const domain = process.env.METERED_DOMAIN || 'alphy';
     const response = await fetch(
-      `https://alphy.metered.live/api/v1/turn/credentials?apiKey=${apiKey}`
+      `https://${domain}.metered.live/api/v1/turn/credentials?apiKey=${apiKey}`
     );
     if (!response.ok) throw new Error(`Metered API error: ${response.status}`);
     const servers = await response.json();

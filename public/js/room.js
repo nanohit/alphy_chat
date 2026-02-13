@@ -296,6 +296,9 @@
         const peer = this.peers.get(peerId);
         if (peer && peer.videoEl) {
           peer.videoEl.srcObject = remoteStream;
+          // iOS Safari won't autoplay audio without explicit .play()
+          const playPromise = peer.videoEl.play();
+          if (playPromise) playPromise.catch(() => {});
         }
       };
 
