@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>alphy.chat</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="landing">
+    <div class="landing-content">
+      <h1 class="logo">alphy<span class="logo-bold">.chat</span></h1>
+
+      <button id="createBtn" class="btn-create">+ новый звонок</button>
+
+      <div class="join-section">
+        <p class="join-label">Подключиться по коду</p>
+        <div class="code-inputs" id="codeInputs">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="code-digit" data-index="0" autocomplete="off">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="code-digit" data-index="1" autocomplete="off">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="code-digit" data-index="2" autocomplete="off">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="code-digit" data-index="3" autocomplete="off">
+        </div>
+      </div>
+
+      <div id="error" class="error-msg" hidden></div>
+      <div id="loading" class="loading-msg" hidden>
+        <div class="spinner"></div>
+        <span id="loadingText"></span>
+      </div>
+    </div>
+
+    <footer class="landing-footer">
+      <span>только браузер</span>
+      <span class="sep">|</span>
+      <span>AES-256 шифрование</span>
+      <span class="sep">|</span>
+      <span>P2P</span>
+    </footer>
+  </div>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>
