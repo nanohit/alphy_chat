@@ -80,19 +80,22 @@ app.get('/api/rooms/:id', (req, res) => {
   });
 });
 
+// STUN fallback servers (multiple providers for reliability)
+const STUN_FALLBACK = [
+  { urls: 'stun:stun.relay.metered.ca:80' },
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+];
+
 // Proxy TURN credentials from Metered.ca
 app.get('/api/turn-credentials', async (req, res) => {
   const apiKey = process.env.METERED_API_KEY;
-  if (!apiKey) {
-    // Return only STUN servers if no TURN configured
-    return res.json([
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-    ]);
+  const domain = process.env.METERED_DOMAIN;
+  if (!apiKey || !domain) {
+    return res.json(STUN_FALLBACK);
   }
 
   try {
-    const domain = process.env.METERED_DOMAIN || 'alphy';
     const response = await fetch(
       `https://${domain}.metered.live/api/v1/turn/credentials?apiKey=${apiKey}`
     );
@@ -101,11 +104,7 @@ app.get('/api/turn-credentials', async (req, res) => {
     res.json(servers);
   } catch (err) {
     console.error('TURN credential fetch failed:', err.message);
-    // Fallback to STUN only
-    res.json([
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-    ]);
+    res.json(STUN_FALLBACK);
   }
 });
 
@@ -161,10 +160,12 @@ io.on('connection', (socket) => {
 
   // Targeted signaling — relay to specific peer
   socket.on('offer', ({ target, sdp }) => {
+    console.log(`[signal] offer ${socket.id} → ${target}`);
     io.to(target).emit('offer', { sender: socket.id, sdp });
   });
 
   socket.on('answer', ({ target, sdp }) => {
+    console.log(`[signal] answer ${socket.id} → ${target}`);
     io.to(target).emit('answer', { sender: socket.id, sdp });
   });
 
@@ -210,10 +211,29 @@ io.on('connection', (socket) => {
   }
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   const proto = server instanceof https.Server ? 'https' : 'http';
   console.log(`Alphy Chat server running on port ${PORT}`);
   console.log(`Open ${proto}://localhost:${PORT}`);
+
+  // Check TURN configuration at startup
+  const apiKey = process.env.METERED_API_KEY;
+  const domain = process.env.METERED_DOMAIN;
+  if (!apiKey || !domain) {
+    console.warn('⚠ TURN not configured (set METERED_API_KEY + METERED_DOMAIN). Using STUN only — P2P may fail on restrictive networks.');
+  } else {
+    try {
+      const r = await fetch(`https://${domain}.metered.live/api/v1/turn/credentials?apiKey=${apiKey}`);
+      if (r.ok) {
+        console.log(`✓ TURN credentials OK (${domain}.metered.live)`);
+      } else {
+        const body = await r.text();
+        console.error(`✗ TURN credentials FAILED (${r.status}): ${body}. Check METERED_DOMAIN and METERED_API_KEY.`);
+      }
+    } catch (err) {
+      console.error(`✗ TURN endpoint unreachable (${domain}.metered.live): ${err.message}`);
+    }
+  }
   if (proto === 'https') {
     const ifaces = require('os').networkInterfaces();
     for (const [name, addrs] of Object.entries(ifaces)) {
