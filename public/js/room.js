@@ -324,9 +324,11 @@
         remoteStream.addTrack(event.track);
         const peer = this.peers.get(peerId);
 
-        if (peer && peer.videoEl) {
+        // Only set srcObject once — subsequent tracks are added to the same
+        // stream automatically. Re-setting srcObject + play() causes AbortError.
+        if (peer && peer.videoEl && peer.videoEl.srcObject !== remoteStream) {
           peer.videoEl.srcObject = remoteStream;
-          peer.videoEl.play().catch((err) => console.warn('play() failed:', err));
+          peer.videoEl.play().catch(() => {});
         }
 
         // iOS only: route audio through AudioContext to fix earpiece-only routing
@@ -351,16 +353,17 @@
         }
       };
 
+      // Only initiator restarts ICE — prevents both sides looping offers
       pc.oniceconnectionstatechange = () => {
-        if (pc.iceConnectionState === 'failed') {
+        if (pc.iceConnectionState === 'failed' && isInitiator) {
           this.restartIce(pc, peerId);
         }
-        if (pc.iceConnectionState === 'disconnected') {
+        if (pc.iceConnectionState === 'disconnected' && isInitiator) {
           setTimeout(() => {
             if (pc.iceConnectionState === 'disconnected') {
               this.restartIce(pc, peerId);
             }
-          }, 3000);
+          }, 5000);
         }
       };
 
